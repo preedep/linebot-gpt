@@ -48,83 +48,7 @@ fn validate_signature(channel_secret: &str, signature: &str, body: &str) -> bool
     encode(&mac.result().code().to_vec()) == signature
 }
 */
-const FOODS: &'static [&'static str] = &[
-    "กะหรี่ปั๊บ",
-    "แกงบอน",
-    "แกงป่า",
-    "แกงเขียวหวาน",
-    "แกงไตปลา",
-    "แกงส้ม",
-    "แกงเผ็ดเป็ดย่าง",
-    "แกงเลียง",
-    "แกงมัสมั่น",
-    "แกงเหลือง",
-    "แกงเทโพ",
-    "แกงจืด",
-    "แกงโฮะ",
-    "กุนเชียง",
-    "แกงไก่",
-    "กุ้งพริกไทย",
-    "กุ้งชุบแป้งทอด",
-    "กุ้งแช่น้ำปลา",
-    "ไก่อบพริกไทยดำ",
-    "แกงกะหรี่ไก่",
-    "ขนมจีน",
-    "ข้าวคลุกกะปิ",
-    "ข้าวผัดสับปะรด",
-    "ข้าวมันไก่",
-    "ข้าวยำ",
-    "ข้าวห่อใบบัว",
-    "ไข่เจียว",
-    "ไข่ต้ม",
-    "ไข่ลูกเขย",
-    "ไข่พะโล้หมูสามชั้น",
-    "ข้าวแช่",
-    "ต้มยำ",
-    "ต้มยำแซบ",
-    "ต้มข่า",
-    "ต้มจืด",
-    "ผัดกระเพรา",
-    "ผัดขี้เมา",
-    "ผัดไท",
-    "ผัดซีอิ้ว",
-    "ผัดฉ่า",
-    "ผัดวุ้นเส้น",
-    "ผักบุ้งไฟแดง",
-    "ผักคะน้าปลาเค็ม",
-    "ส้มตำ",
-    "สุกีไทย",
-    "ลาบ",
-    "ราดหน้า",
-    "ห่อหมก",
-    "ปลาร้าทรงเครื่อง",
-    "ปลาราดพริก",
-    "พะแนง พะแนงไก่",
-    "พล่าเนื้อ",
-    "ยำใหญ่",
-    "ยำทวาย",
-    "แหนม",
-    "ปูจ๋า",
-    "ปูนิ่มผัดพริกไทดำ",
-    "ตำผลไม้",
-    "บะหมี่หมูแดง",
-    "หมูกะทะ",
-    "หอยหลอดผัดฉ่า",
-    "ไก่ต้มน้ำปลา",
-    "ไก่อบฟาง",
-    "ไก่ทอดน้ำปลา",
-    "ปลากระพงทอดน้ำปลา",
-    "งบปลา",
-    "คั่วกลิ้งหมู",
-    "หลนปูเค็ม",
-    "แจงลอน",
-    "หรุ่ม",
-    "ล่าเตียง",
-    "สาคูไส้หมู",
-    "ปลาทับทิมลุยสวน",
-    "แกงเทโพหมู",
-    "ผัดกระเพราหมู",
-];
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChatQARequest {
@@ -236,31 +160,7 @@ pub async fn callback(
                 // Create TextMessage
                 info!("message : {}", text_message.text);
                 // Reply message with reply_token
-                if text_message.text.trim().eq("Nick:กินอะไรดี") {
-                    /////
-                    let mut extractor = HashMap::new();
-                    extractor.insert("traceparent".to_string(), "/v1/line/webhook".to_string());
-                    let propagator = TraceContextPropagator::new();
-                    let cx = propagator.extract(&extractor);
-                    let span = tracing::info_span!("find-food");
-                    span.set_parent(cx);
-                    let _guard = span.enter();
-                    ///////////
-
-                    let mut rng = rand::thread_rng();
-                    let idx = rng.gen_range(0..(FOODS.len() - 1));
-                    let food = FOODS[idx];
-
-                    let message = SendMessageType::TextMessage(TextMessage {
-                        text: format!("มื้อนี้ {} ลองกิน {} ดูไหมละ", "คุณ", food.to_string()),
-                        emojis: None,
-                    });
-
-                    let _res = bot
-                        .reply_message(&message_event.reply_token, vec![message])
-                        .await;
-                    ////
-                } else if text_message.text.contains(/*"Nick:>"*/config.line_chat_prompt.as_str()) {
+                if text_message.text.contains(/*"Nick:>"*/config.line_chat_prompt.as_str()) {
                     let message = text_message.text.clone();
                     let message = message.replace("Nick:>", "");
 
