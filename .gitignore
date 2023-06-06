@@ -10,3 +10,8 @@ Cargo.lock
 **/*.rs.bk
 docker_run.sh
 run_server.sh
+.idea/.gitignore
+.idea/linebot-gpt.iml
+.idea/misc.xml
+.idea/modules.xml
+.idea/vcs.xml
