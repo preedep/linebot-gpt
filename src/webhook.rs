@@ -1,30 +1,20 @@
-use std::borrow::BorrowMut;
+use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
+use std::sync::Mutex;
+
+use actix_web::{post, web, web::Data, HttpResponse};
+use log::info;
+use opentelemetry::propagation::TextMapPropagator;
+use opentelemetry::sdk::propagation::TraceContextPropagator;
+use opentelemetry::trace::{FutureExt, SpanKind, TraceContextExt, Tracer};
+use opentelemetry::{global, Context, KeyValue};
+use serde_derive::{Deserialize, Serialize};
+
 use crate::bot::LineBot;
 use crate::events::messages::MessageType;
 use crate::events::{EventType, Events};
 use crate::messages::{SendMessageType, TextMessage};
 use crate::support::signature::Signature;
-use actix_web::{post, web, web::Data, HttpResponse};
-use log::{info};
-use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
-use std::sync::Mutex;
-
-use opentelemetry::{Context, global, KeyValue};
-use opentelemetry::propagation::TextMapPropagator;
-use opentelemetry::sdk::propagation::TraceContextPropagator;
-use opentelemetry::trace::{FutureExt, SpanKind, TraceContextExt, Tracer};
-
-use rand::Rng;
-use reqwest::{Error, Response};
-
-
-use serde_derive::{Deserialize, Serialize};
-
-use tracing_opentelemetry::OpenTelemetrySpanExt;
-
-
-
 
 /// Signature validator
 /// # Note
@@ -48,13 +38,12 @@ fn validate_signature(channel_secret: &str, signature: &str, body: &str) -> bool
     encode(&mac.result().code().to_vec()) == signature
 }
 */
-
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChatQARequest {
     #[serde(rename = "prompt_message")]
     pub prompt_message: String,
 }
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChatQAReponse {
     #[serde(rename = "message")]
@@ -70,22 +59,25 @@ pub struct CompletionRequest {
     #[serde(rename = "max_tokens")]
     pub max_token: i32,
     #[serde(rename = "temperature")]
-    pub temperature: Option<f32>
+    pub temperature: Option<f32>,
 }
-impl Display for CompletionRequest{
+
+impl Display for CompletionRequest {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "model = {}, prompt = {} , max_tokens = {} ",
-            self.model,self.prompt,self.max_token,
+            self.model, self.prompt, self.max_token,
         )
     }
 }
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChatGPTChoice {
     #[serde(rename = "text")]
     pub text: String,
 }
+
 impl Display for ChatGPTChoice {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "text = {}", self.text)
@@ -101,6 +93,7 @@ pub struct ChatGPTUsage {
     #[serde(rename = "total_tokens")]
     pub total_tokens: i32,
 }
+
 impl Display for ChatGPTUsage {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -110,6 +103,7 @@ impl Display for ChatGPTUsage {
         )
     }
 }
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CompletionResponse {
     #[serde(rename = "choices")]
@@ -117,6 +111,7 @@ pub struct CompletionResponse {
     #[serde(rename = "usage")]
     pub usage: ChatGPTUsage,
 }
+
 impl Display for CompletionResponse {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut msg = "".to_string();
@@ -127,6 +122,7 @@ impl Display for CompletionResponse {
         write!(f, "{}", msg)
     }
 }
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LineKeys {
     pub channel_secret: String,
@@ -134,8 +130,9 @@ pub struct LineKeys {
     pub chat_gpt_api_key: String,
     pub chat_gpt_max_tokens: Option<i32>,
     pub chat_gpt_temperature: Option<f32>,
-    pub line_chat_prompt : String,
+    pub line_chat_prompt: String,
 }
+
 #[post("/v1/line/webhook")]
 pub async fn callback(
     _signature: Signature,
@@ -143,7 +140,6 @@ pub async fn callback(
     config: Data<Mutex<LineKeys>>,
     bytes: web::Bytes,
 ) -> HttpResponse {
-
     let config = config.lock().unwrap();
 
     // LineBot
@@ -160,7 +156,10 @@ pub async fn callback(
                 // Create TextMessage
                 info!("message : {}", text_message.text);
                 // Reply message with reply_token
-                if text_message.text.contains(/*"Nick:>"*/config.line_chat_prompt.as_str()) {
+                if text_message
+                    .text
+                    .contains(/*"Nick:>"*/ config.line_chat_prompt.as_str())
+                {
                     let message = text_message.text.clone();
                     let message = message.replace("Nick:>", "");
 
@@ -173,10 +172,7 @@ pub async fn callback(
 
                     /////
                     let mut extractor = HashMap::new();
-                    extractor.insert(
-                        "traceparent".to_string(),
-                        "line-botx".to_string(),
-                    );
+                    extractor.insert("traceparent".to_string(), "line-botx".to_string());
                     let propagator = TraceContextPropagator::new();
                     let _guard = propagator.extract(&extractor).attach();
 
@@ -189,16 +185,21 @@ pub async fn callback(
                     let span = tracer
                         .span_builder(span_request_chat_gpt)
                         .with_attributes(vec![
-                            KeyValue::new("service.namespace + service.name","ChatGPT"),
+                            KeyValue::new("service.namespace + service.name", "ChatGPT"),
                             KeyValue::new("service.version", "1.0"),
                             KeyValue::new("http.url", "https://api.openai.com/v1/completions"),
-                            KeyValue::new("http.scheme + http.host + http.target", "https://api.openai.com/v1/completions"),
-                        ]).with_kind(SpanKind::Server)
+                            KeyValue::new(
+                                "http.scheme + http.host + http.target",
+                                "https://api.openai.com/v1/completions",
+                            ),
+                        ])
+                        .with_kind(SpanKind::Server)
                         .start(&tracer);
 
                     let cx = Context::current_with_span(span);
                     /////////
-                    tracing::info!("Request to ChatGPT = {:#}\n", &req_completion).with_context(cx.to_owned());
+                    tracing::info!("Request to ChatGPT = {:#}\n", &req_completion)
+                        .with_context(cx.to_owned());
                     let authorization_api_key =
                         format!("Bearer {}", config.chat_gpt_api_key.as_str());
                     let client = reqwest::Client::new();
@@ -206,7 +207,8 @@ pub async fn callback(
                         .post("https://api.openai.com/v1/completions")
                         .header("Authorization", authorization_api_key)
                         .json(&req_completion)
-                        .send().with_context(cx.to_owned())
+                        .send()
+                        .with_context(cx.to_owned())
                         .await;
                     /////
                     match res {
@@ -214,7 +216,8 @@ pub async fn callback(
                             let msg_resp = r.json::<CompletionResponse>().await;
                             match msg_resp {
                                 Ok(msg) => {
-                                    tracing::info!("Complete Response = {:#}\n", msg).with_context(cx.to_owned());
+                                    tracing::info!("Complete Response = {:#}\n", msg)
+                                        .with_context(cx.to_owned());
                                     let mut message_out = String::new();
                                     for (_pos, choice) in msg.choices.iter().enumerate() {
                                         message_out.push_str(choice.text.as_str());
@@ -228,26 +231,40 @@ pub async fn callback(
                                     let span_line_bot = tracer
                                         .span_builder(span_request_line_bot_api)
                                         .with_attributes(vec![
-                                            KeyValue::new("service.namespace + service.name","LineBot"),
+                                            KeyValue::new(
+                                                "service.namespace + service.name",
+                                                "LineBot",
+                                            ),
                                             KeyValue::new("service.version", "1.0"),
-                                            KeyValue::new("http.url", "https://api.line.me/message/reply"),
-                                            KeyValue::new("http.scheme + http.host + http.target", "https://api.line.me/message/reply"),
-                                        ]).with_kind(SpanKind::Server)
+                                            KeyValue::new(
+                                                "http.url",
+                                                "https://api.line.me/message/reply",
+                                            ),
+                                            KeyValue::new(
+                                                "http.scheme + http.host + http.target",
+                                                "https://api.line.me/message/reply",
+                                            ),
+                                        ])
+                                        .with_kind(SpanKind::Server)
                                         .start(&tracer);
 
                                     let cx = Context::current_with_span(span_line_bot);
                                     let res = bot
-                                        .reply_message_with_context(&message_event.reply_token, vec![message],cx.to_owned())
+                                        .reply_message_with_context(
+                                            &message_event.reply_token,
+                                            vec![message],
+                                            cx.to_owned(),
+                                        )
                                         .await;
-                                    
+
                                     match res {
                                         Ok(_) => {}
                                         Err(e) => {
-                                            tracing::error!("Reply message error {}", e).with_context(cx);
+                                            tracing::error!("Reply message error {}", e)
+                                                .with_context(cx);
                                             return HttpResponse::InternalServerError().finish();
                                         }
                                     }
-
                                 }
                                 Err(e) => {
                                     tracing::error!("Chat Error {}", e);

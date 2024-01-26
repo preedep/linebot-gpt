@@ -1,9 +1,9 @@
-use opentelemetry::Context;
 use opentelemetry::trace::FutureExt;
+use opentelemetry::Context;
+use reqwest::{Client, Error, Response};
 //use reqwest::blocking::{Client, Response};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use reqwest::Url;
-use reqwest::{Client, Error, Response};
 use serde_json::Value;
 
 static BASE_URL: &str = "https://api.line.me/v2/bot";
@@ -100,7 +100,12 @@ impl HttpClient {
     /// ```
     /// let res: Result<Response, Error> = http_client.post("https://example.com");
     /// ```
-    pub async fn post_with_context(&self, endpoint: &str, data: Value,context: Context) -> Result<Response, Error> {
+    pub async fn post_with_context(
+        &self,
+        endpoint: &str,
+        data: Value,
+        context: Context,
+    ) -> Result<Response, Error> {
         let uri = Url::parse(&format!("{}{}", self.endpoint_base, endpoint)).unwrap();
         self.client
             .post(uri)

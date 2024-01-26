@@ -1,8 +1,9 @@
 use opentelemetry::Context;
-use crate::client::HttpClient;
-use crate::messages::SendMessageType;
 use reqwest::{Error, Response};
 use serde_json::{json, Value};
+
+use crate::client::HttpClient;
+use crate::messages::SendMessageType;
 
 /// LineBot Client
 #[derive(Debug)]
@@ -11,6 +12,7 @@ pub struct LineBot {
     pub channel_token: String,
     pub http_client: HttpClient,
 }
+
 impl LineBot {
     /// # Note
     /// Instantiate a LineBot.
@@ -52,7 +54,7 @@ impl LineBot {
         &self,
         reply_token: &str,
         msgs: Vec<SendMessageType>,
-        context: Context
+        context: Context,
     ) -> Result<Response, Error> {
         let data: Value = json!(
                 {
@@ -60,6 +62,8 @@ impl LineBot {
                 "messages": msgs,
                 }
         );
-        self.http_client.post_with_context("/message/reply", data,context.to_owned()).await
+        self.http_client
+            .post_with_context("/message/reply", data, context.to_owned())
+            .await
     }
 }
