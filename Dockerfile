@@ -13,8 +13,8 @@ ARG BASE_IMAGE=rust:alpine
 FROM ${BASE_IMAGE} AS builder
 
 RUN apk update
-RUN apk add --no-cache openssl-dev musl-dev perl build-base
-
+#RUN apk add --no-cache openssl-dev musl-dev perl build-base
+RUN apk add --no-cache musl-dev
 # Add our source code.
 ADD --chown=rust:rust . ./
 
@@ -40,7 +40,8 @@ RUN addgroup -S $APP_USER \
 
 RUN apk update \
   && apk --no-cache add ca-certificates \
-  && apk add curl openssl-dev libc-dev zlib-dev libc6-compat supervisor\
+# && apk add curl openssl-dev libc-dev zlib-dev libc6-compat supervisor\
+  && apk add  supervisor \
   && rm -rf /var/cache/apk/*ls
 
 

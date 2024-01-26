@@ -80,11 +80,11 @@ async fn main() -> std::io::Result<()> {
             .service(webhook::callback)
             .service(
                 web::resource("/")
-                    .route(web::get().to(|| async {HttpResponse::Ok().body("Hello World!")}))
+                    .route(web::get().to(|| async { HttpResponse::Ok().body("Hello World!") }))
             )
     })
         .workers(20)
-        .bind("0.0.0.0:8000")?
+        .bind("0.0.0.0:8080")?
         .run()
         .await?;
 
