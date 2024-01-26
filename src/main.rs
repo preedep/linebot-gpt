@@ -1,16 +1,15 @@
 use std::env;
 use std::sync::Mutex;
-use std::time::Duration;
 
+use actix_web::{App, HttpResponse, HttpServer, web, web::Data};
 use actix_web::middleware::Logger;
-use actix_web::{web::Data, App, HttpServer};
-use actix_web_opentelemetry::{RequestMetricsBuilder, RequestTracing};
+use actix_web_opentelemetry::RequestTracing;
 use opentelemetry::global::shutdown_tracer_provider;
-use opentelemetry::sdk::export::metrics::aggregation::stateless_temporality_selector;
-use opentelemetry::sdk::metrics::{controllers, processors, selectors};
-use opentelemetry::{global, metrics::Unit, Context, KeyValue};
-use rand::{thread_rng, Rng};
-use tracing_subscriber::{layer::SubscriberExt, Registry};
+use rand::Rng;
+use tracing::debug;
+use tracing_actix_web::TracingLogger;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::Registry;
 
 use crate::webhook::LineKeys;
 
@@ -24,73 +23,29 @@ mod webhook;
 
 //use chatgpt::prelude::*;
 
-//open api key
-//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
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    //std::env::set_var("RUST_LOG", "actix_web=info");
-    env_logger::init();
+    let app_insights_connection_str = env::var("APPLICATIONINSIGHTS_CON_STRING");
 
-    let instrumentation_key = std::env::var("INSTRUMENTATION_KEY")
-        .unwrap_or_else(|_| "10848a4a-6c1b-45bd-9113-152bcfbac1cc".to_string());
-    let instrumentation_endpoint = std::env::var("INSTRUMENTATION_ENDPOINT")
-        .unwrap_or_else(|_| "https://southeastasia-1.in.applicationinsights.azure.com".to_string());
+    if let Ok(app_insights_connection) = app_insights_connection_str {
+        debug!(
+                "APPLICATIONINSIGHTS_CON_STRING = {}",
+                app_insights_connection
+            );
+        let exporter = opentelemetry_application_insights::new_pipeline_from_connection_string(
+            app_insights_connection,
+        )
+            .unwrap()
+            .with_client(reqwest::Client::new())
+            .with_service_name("LineChatBot")
+            .install_simple();
 
-    let tracer = opentelemetry_application_insights::new_pipeline(instrumentation_key.to_owned())
-        .with_client(reqwest::Client::new())
-        .with_endpoint(instrumentation_endpoint.to_owned().as_str())
-        .unwrap()
-        .install_batch(opentelemetry::runtime::Tokio);
-
-    let telemetry = tracing_opentelemetry::layer().with_tracer(tracer.to_owned());
-    let subscriber = Registry::default().with(telemetry);
-    tracing::subscriber::set_global_default(subscriber).expect("setting global default failed");
-
-    //global::set_tracer_provider(tracer.to_owned().provider().unwrap());
-
-    //////
-    let temporality_selector = stateless_temporality_selector();
-    let exporter =
-        opentelemetry_application_insights::Exporter::new(instrumentation_key.to_owned(), ())
-            .with_temporality_selector(temporality_selector.clone())
-            .with_endpoint(instrumentation_endpoint.to_owned().as_str())
-            .expect("Export exporter error");
-    let controller = controllers::basic(processors::factory(
-        //selectors::simple::inexpensive(),
-        selectors::simple::histogram([1.0, 2.0, 5.0, 10.0, 20.0, 50.0]),
-        temporality_selector,
-    ))
-    .with_exporter(exporter)
-    .with_collect_period(Duration::from_secs(1))
-    .build();
-
-    let meter = global::meter("actix_web");
-    let cpu_utilization_gauge = meter
-        .to_owned()
-        .f64_observable_gauge("system.cpu.utilization")
-        .with_unit(Unit::new("1"))
-        .init();
-    meter
-        .register_callback(move |cx| {
-            let mut rng = thread_rng();
-            cpu_utilization_gauge.observe(
-                cx,
-                rng.gen_range(0.1..0.2),
-                &[KeyValue::new("state", "idle"), KeyValue::new("cpu", 0)],
-            )
-        })
-        .expect("");
-
-    let request_metrics = RequestMetricsBuilder::new().build(meter.to_owned());
-
-    //////////
-    let cx = Context::new();
-    controller
-        .start(&cx, opentelemetry::runtime::Tokio)
-        .unwrap();
-    global::set_meter_provider(controller.clone());
-
+        let telemetry = tracing_opentelemetry::layer().with_tracer(exporter);
+        let subscriber = Registry::default().with(telemetry);
+        tracing::subscriber::set_global_default(subscriber)
+            .expect("setting global default failed");
+    }
     ////////
 
     let channel_secret: &str =
@@ -120,14 +75,18 @@ async fn main() -> std::io::Result<()> {
             .wrap(Logger::default())
             .wrap(Logger::new("%a %{User-Agent}i"))
             .wrap(RequestTracing::new())
-            .wrap(request_metrics.clone())
+            .wrap(TracingLogger::default())
             .app_data(Data::clone(&data))
             .service(webhook::callback)
+            .service(
+                web::resource("/")
+                    .route(web::get().to(|| async {HttpResponse::Ok().body("Hello World!")}))
+            )
     })
-    .workers(20)
-    .bind("0.0.0.0:8000")?
-    .run()
-    .await?;
+        .workers(20)
+        .bind("0.0.0.0:8000")?
+        .run()
+        .await?;
 
     // wait until all pending spans get exported.
     shutdown_tracer_provider();

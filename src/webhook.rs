@@ -1,18 +1,16 @@
-use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::sync::Mutex;
 
-use actix_web::{post, web, web::Data, HttpResponse};
+use actix_web::{HttpResponse, post, web, web::Data};
 use log::info;
 use opentelemetry::propagation::TextMapPropagator;
-use opentelemetry::sdk::propagation::TraceContextPropagator;
-use opentelemetry::trace::{FutureExt, SpanKind, TraceContextExt, Tracer};
-use opentelemetry::{global, Context, KeyValue};
+use opentelemetry::trace::Tracer;
 use serde_derive::{Deserialize, Serialize};
+use tracing_attributes::instrument;
 
 use crate::bot::LineBot;
+use crate::events::{Events, EventType};
 use crate::events::messages::MessageType;
-use crate::events::{EventType, Events};
 use crate::messages::{SendMessageType, TextMessage};
 use crate::support::signature::Signature;
 
@@ -133,6 +131,7 @@ pub struct LineKeys {
     pub line_chat_prompt: String,
 }
 
+#[instrument(skip(config))]
 #[post("/v1/line/webhook")]
 pub async fn callback(
     _signature: Signature,
@@ -170,36 +169,6 @@ pub async fn callback(
                         temperature: Some(0.5),
                     };
 
-                    /////
-                    let mut extractor = HashMap::new();
-                    extractor.insert("traceparent".to_string(), "line-botx".to_string());
-                    let propagator = TraceContextPropagator::new();
-                    let _guard = propagator.extract(&extractor).attach();
-
-                    let tracer = global::tracer("request-chat-gpt-api");
-                    //let span = tracing::info_span!("chat-gpt-request");
-                    //span.set_parent(cx);
-                    //let _guard = span.enter();
-                    let span_request_chat_gpt = "request-chat-gpt-api";
-
-                    let span = tracer
-                        .span_builder(span_request_chat_gpt)
-                        .with_attributes(vec![
-                            KeyValue::new("service.namespace + service.name", "ChatGPT"),
-                            KeyValue::new("service.version", "1.0"),
-                            KeyValue::new("http.url", "https://api.openai.com/v1/completions"),
-                            KeyValue::new(
-                                "http.scheme + http.host + http.target",
-                                "https://api.openai.com/v1/completions",
-                            ),
-                        ])
-                        .with_kind(SpanKind::Server)
-                        .start(&tracer);
-
-                    let cx = Context::current_with_span(span);
-                    /////////
-                    tracing::info!("Request to ChatGPT = {:#}\n", &req_completion)
-                        .with_context(cx.to_owned());
                     let authorization_api_key =
                         format!("Bearer {}", config.chat_gpt_api_key.as_str());
                     let client = reqwest::Client::new();
@@ -208,7 +177,7 @@ pub async fn callback(
                         .header("Authorization", authorization_api_key)
                         .json(&req_completion)
                         .send()
-                        .with_context(cx.to_owned())
+
                         .await;
                     /////
                     match res {
@@ -216,8 +185,6 @@ pub async fn callback(
                             let msg_resp = r.json::<CompletionResponse>().await;
                             match msg_resp {
                                 Ok(msg) => {
-                                    tracing::info!("Complete Response = {:#}\n", msg)
-                                        .with_context(cx.to_owned());
                                     let mut message_out = String::new();
                                     for (_pos, choice) in msg.choices.iter().enumerate() {
                                         message_out.push_str(choice.text.as_str());
@@ -227,41 +194,16 @@ pub async fn callback(
                                         emojis: None,
                                     });
 
-                                    let span_request_line_bot_api = "request-to-line-bot-api";
-                                    let span_line_bot = tracer
-                                        .span_builder(span_request_line_bot_api)
-                                        .with_attributes(vec![
-                                            KeyValue::new(
-                                                "service.namespace + service.name",
-                                                "LineBot",
-                                            ),
-                                            KeyValue::new("service.version", "1.0"),
-                                            KeyValue::new(
-                                                "http.url",
-                                                "https://api.line.me/message/reply",
-                                            ),
-                                            KeyValue::new(
-                                                "http.scheme + http.host + http.target",
-                                                "https://api.line.me/message/reply",
-                                            ),
-                                        ])
-                                        .with_kind(SpanKind::Server)
-                                        .start(&tracer);
-
-                                    let cx = Context::current_with_span(span_line_bot);
                                     let res = bot
-                                        .reply_message_with_context(
+                                        .reply_message(
                                             &message_event.reply_token,
                                             vec![message],
-                                            cx.to_owned(),
                                         )
                                         .await;
 
                                     match res {
                                         Ok(_) => {}
                                         Err(e) => {
-                                            tracing::error!("Reply message error {}", e)
-                                                .with_context(cx);
                                             return HttpResponse::InternalServerError().finish();
                                         }
                                     }
