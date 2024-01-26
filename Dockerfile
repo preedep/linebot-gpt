@@ -23,11 +23,9 @@ RUN cargo install --path .
 
 
 # Now, we need to build our _real_ Docker container, copying in `using-diesel`.
-FROM alpine:latest
+FROM alpine:3.17 AS runtime
 
 ARG APP=/myapp
-
-EXPOSE 8080
 
 ENV TZ=Asia/Bangkok \
     APP_USER=appuser \
@@ -41,22 +39,15 @@ RUN addgroup -S $APP_USER \
 RUN apk update \
   && apk --no-cache add ca-certificates \
 # && apk add curl openssl-dev libc-dev zlib-dev libc6-compat supervisor\
-  && apk add  supervisor \
   && rm -rf /var/cache/apk/*ls
-
 
 RUN openssl s_client -connect southeastasia-1.in.applicationinsights.azure.com:443 -showcerts </dev/null 2>/dev/null | sed -e '/-----BEGIN/,/-----END/!d' | tee "/usr/local/share/ca-certificates/ca.crt" >/dev/null && \
 update-ca-certificates
 
 COPY --from=builder /usr/local/cargo/bin/line_botx ${APP}/line_botx.linux
 
-#COPY chatgptproxy.linux ${APP}/chatgptproxy.linux
-COPY supervisord.conf /etc/supervisord.conf
-
 RUN chown -R $APP_USER:$APP_USER ${APP}
-
+EXPOSE 8080
 USER $APP_USER
 WORKDIR ${APP}
-
-#ENTRYPOINT ["./line_botx"]
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
+CMD ["./line_botx.linux"]
