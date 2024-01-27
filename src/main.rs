@@ -4,12 +4,14 @@ use std::sync::Mutex;
 use actix_web::{App, HttpResponse, HttpServer, web, web::Data};
 use actix_web::middleware::Logger;
 use actix_web_opentelemetry::RequestTracing;
+use opentelemetry::global;
 use opentelemetry::global::shutdown_tracer_provider;
+use opentelemetry::trace::Tracer as _;
+use opentelemetry_sdk::metrics::{MeterProvider, PeriodicReader};
 use rand::Rng;
 use tracing::debug;
 use tracing_actix_web::TracingLogger;
 use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::Registry;
 
 use crate::webhook::LineKeys;
 
@@ -23,16 +25,15 @@ mod webhook;
 
 //use chatgpt::prelude::*;
 
-
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let app_insights_connection_str = env::var("APPLICATIONINSIGHTS_CON_STRING");
 
     if let Ok(app_insights_connection) = app_insights_connection_str {
         debug!(
-                "APPLICATIONINSIGHTS_CON_STRING = {}",
-                app_insights_connection
-            );
+            "APPLICATIONINSIGHTS_CON_STRING = {}",
+            app_insights_connection
+        );
         let exporter = opentelemetry_application_insights::new_pipeline_from_connection_string(
             app_insights_connection,
         )
@@ -42,10 +43,16 @@ async fn main() -> std::io::Result<()> {
             .with_live_metrics(true)
             .install_batch(opentelemetry_sdk::runtime::Tokio);
 
+        /*
         let telemetry = tracing_opentelemetry::layer().with_tracer(exporter);
         let subscriber = Registry::default().with(telemetry);
         tracing::subscriber::set_global_default(subscriber)
             .expect("setting global default failed");
+         */
+
+        let reader = PeriodicReader::builder(exporter, opentelemetry_sdk::runtime::Tokio).build();
+        let meter_provider = MeterProvider::builder().with_reader(reader).build();
+        global::set_meter_provider(meter_provider);
     }
     ////////
 
@@ -81,7 +88,7 @@ async fn main() -> std::io::Result<()> {
             .service(webhook::callback)
             .service(
                 web::resource("/")
-                    .route(web::get().to(|| async { HttpResponse::Ok().body("Hello World!") }))
+                    .route(web::get().to(|| async { HttpResponse::Ok().body("Hello World!") })),
             )
     })
         .workers(20)

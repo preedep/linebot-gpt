@@ -131,20 +131,20 @@ pub struct LineKeys {
     pub line_chat_prompt: String,
 }
 
-#[instrument(skip(config))]
+#[instrument(skip(config, _signature, _bytes))]
 #[post("/v1/line/webhook")]
 pub async fn callback(
     _signature: Signature,
     data: web::Json<Events>,
     config: Data<Mutex<LineKeys>>,
-    bytes: web::Bytes,
+    _bytes: web::Bytes,
 ) -> HttpResponse {
     let config = config.lock().unwrap();
 
     // LineBot
     let bot = LineBot::new(config.channel_secret.as_str(), config.access_token.as_str());
 
-    let body: &str = &String::from_utf8(bytes.to_vec()).unwrap();
+    //let body: &str = &String::from_utf8(bytes.to_vec()).unwrap();
     //validate_signature(&bot.channel_secret, &signature.key, &body);
 
     for event in &data.events {
@@ -155,12 +155,10 @@ pub async fn callback(
                 // Create TextMessage
                 info!("message : {}", text_message.text);
                 // Reply message with reply_token
-                if text_message
-                    .text
-                    .contains(/*"Nick:>"*/ config.line_chat_prompt.as_str())
-                {
+                let prompt = config.line_chat_prompt.as_str();
+                if text_message.text.contains(/*"Nick:>"*/ prompt) {
                     let message = text_message.text.clone();
-                    let message = message.replace("Nick:>", "");
+                    let message = message.replace(prompt, "");
 
                     let req_completion = CompletionRequest {
                         model: "text-davinci-003".to_string(),
@@ -177,7 +175,6 @@ pub async fn callback(
                         .header("Authorization", authorization_api_key)
                         .json(&req_completion)
                         .send()
-
                         .await;
                     /////
                     match res {
@@ -195,21 +192,15 @@ pub async fn callback(
                                     });
 
                                     let res = bot
-                                        .reply_message(
-                                            &message_event.reply_token,
-                                            vec![message],
-                                        )
+                                        .reply_message(&message_event.reply_token, vec![message])
                                         .await;
-
-                                    match res {
-                                        Ok(_) => {}
-                                        Err(e) => {
-                                            return HttpResponse::InternalServerError().finish();
-                                        }
+                                    if let Err(e) = res {
+                                        tracing::error!("Reply Chat Error {}", e);
+                                        return HttpResponse::InternalServerError().finish();
                                     }
                                 }
                                 Err(e) => {
-                                    tracing::error!("Chat Error {}", e);
+                                    tracing::error!("Parse CompletionResponse Error {}", e);
                                     return HttpResponse::InternalServerError().finish();
                                 }
                             }

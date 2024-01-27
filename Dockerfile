@@ -23,7 +23,7 @@ RUN cargo install --path .
 
 
 # Now, we need to build our _real_ Docker container, copying in `using-diesel`.
-FROM alpine:3.17 AS runtime
+FROM alpine:3.19 AS runtime
 
 ARG APP=/myapp
 
