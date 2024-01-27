@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::sync::Mutex;
 
-use actix_web::{HttpResponse, post, web, web::Data};
+use actix_web::{post, web, web::Data, HttpResponse};
 use log::info;
 use opentelemetry::propagation::TextMapPropagator;
 use opentelemetry::trace::Tracer;
@@ -9,8 +9,8 @@ use serde_derive::{Deserialize, Serialize};
 use tracing_attributes::instrument;
 
 use crate::bot::LineBot;
-use crate::events::{Events, EventType};
 use crate::events::messages::MessageType;
+use crate::events::{EventType, Events};
 use crate::messages::{SendMessageType, TextMessage};
 use crate::support::signature::Signature;
 
