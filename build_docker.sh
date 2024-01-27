@@ -17,6 +17,6 @@
 
 echo "building docker image ....."
 docker rmi -f line-botx:latest
-docker build -t line-botx .
+docker build -t line-botx .  --platform linux/amd64
 
 docker images -a | grep none | awk '{ print $3; }' | xargs docker rmi
