@@ -4,6 +4,7 @@ use std::sync::Mutex;
 use actix_web::middleware::Logger;
 use actix_web::{web, web::Data, App, HttpResponse, HttpServer};
 use actix_web_opentelemetry::RequestTracing;
+use log::info;
 use opentelemetry::global;
 use opentelemetry::global::shutdown_tracer_provider;
 use opentelemetry::trace::Tracer as _;
@@ -28,8 +29,10 @@ mod webhook;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let app_insights_connection_str = env::var("APPLICATIONINSIGHTS_CON_STRING");
+    pretty_env_logger::init();
+    info!("Starting LineChatBot");
 
+    let app_insights_connection_str = env::var("APPLICATIONINSIGHTS_CON_STRING");
     if let Ok(app_insights_connection) = app_insights_connection_str {
         debug!(
             "APPLICATIONINSIGHTS_CON_STRING = {}",
