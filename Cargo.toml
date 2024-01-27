@@ -29,3 +29,4 @@ tracing-futures = "0.2"
 tracing-opentelemetry = "0.22"
 tracing-subscriber = {version = "0.3"}
 tracing-actix-web = "0.7"
+opentelemetry_sdk = { version = "0.21" ,default-features = false, features = ["trace","logs","metrics","rt-tokio"] }

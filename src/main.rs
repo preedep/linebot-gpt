@@ -39,7 +39,8 @@ async fn main() -> std::io::Result<()> {
             .unwrap()
             .with_client(reqwest::Client::new())
             .with_service_name("LineChatBot")
-            .install_simple();
+            .with_live_metrics(true)
+            .install_batch(opentelemetry_sdk::runtime::Tokio);
 
         let telemetry = tracing_opentelemetry::layer().with_tracer(exporter);
         let subscriber = Registry::default().with(telemetry);

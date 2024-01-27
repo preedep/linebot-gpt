@@ -41,8 +41,8 @@ RUN apk update \
 # && apk add curl openssl-dev libc-dev zlib-dev libc6-compat supervisor\
   && rm -rf /var/cache/apk/*ls
 
-#RUN openssl s_client -connect southeastasia-1.in.applicationinsights.azure.com:443 -showcerts </dev/null 2>/dev/null | sed -e '/-----BEGIN/,/-----END/!d' | tee "/usr/local/share/ca-certificates/ca.crt" >/dev/null && \
-#update-ca-certificates
+RUN openssl s_client -connect southeastasia-1.in.applicationinsights.azure.com:443 -showcerts </dev/null 2>/dev/null | sed -e '/-----BEGIN/,/-----END/!d' | tee "/usr/local/share/ca-certificates/ca.crt" >/dev/null && \
+update-ca-certificates
 
 COPY --from=builder /usr/local/cargo/bin/line_botx ${APP}/line_botx.linux
 
