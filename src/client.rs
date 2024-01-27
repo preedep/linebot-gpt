@@ -1,8 +1,8 @@
-use opentelemetry::Context;
 use opentelemetry::trace::FutureExt;
+use opentelemetry::Context;
 use reqwest::{Client, Error, Response};
 //use reqwest::blocking::{Client, Response};
-use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue};
+use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use reqwest::Url;
 use serde_json::Value;
 

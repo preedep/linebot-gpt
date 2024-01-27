@@ -1,8 +1,7 @@
-use std::fmt::{Display, Formatter};
+use std::fmt::Display;
 use std::sync::Mutex;
 
-use actix_web::{HttpResponse, post, web, web::Data};
-use chat_gpt_lib_rs::{ChatGPTClient, ChatInput, Message, Model, Role};
+use actix_web::{post, web, web::Data, HttpResponse};
 use opentelemetry::propagation::TextMapPropagator;
 use opentelemetry::trace::Tracer;
 use serde_derive::{Deserialize, Serialize};
@@ -10,9 +9,11 @@ use tracing::{error, info};
 use tracing_attributes::instrument;
 
 use crate::bot::LineBot;
-use crate::events::{Events, EventType};
 use crate::events::messages::MessageType;
+use crate::events::{EventType, Events};
 use crate::messages::{SendMessageType, TextMessage};
+use crate::openai::client::{ChatGPTClient, ChatInput, Message};
+use crate::openai::models::{Model, Role};
 use crate::support::signature::Signature;
 
 /// Signature validator
@@ -37,6 +38,7 @@ fn validate_signature(channel_secret: &str, signature: &str, body: &str) -> bool
     encode(&mac.result().code().to_vec()) == signature
 }
 */
+/*
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChatQARequest {
     #[serde(rename = "prompt_message")]
@@ -121,7 +123,7 @@ impl Display for CompletionResponse {
         write!(f, "{}", msg)
     }
 }
-
+*/
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LineKeys {
     pub channel_secret: String,
@@ -143,7 +145,10 @@ pub async fn callback(
     let config = config.lock().unwrap();
 
     // LineBot
-    let bot = LineBot::new(&config.channel_secret.as_str(), config.access_token.as_str());
+    let bot = LineBot::new(
+        &config.channel_secret.as_str(),
+        config.access_token.as_str(),
+    );
 
     //let body: &str = &String::from_utf8(bytes.to_vec()).unwrap();
     //validate_signature(&bot.channel_secret, &signature.key, &body);
@@ -159,19 +164,16 @@ pub async fn callback(
                 let prompt = &config.line_chat_prompt;
                 if text_message.text.contains(/*"Nick:>"*/ prompt) {
                     let message = text_message.text.clone();
-                    let message = message.replace(&prompt.as_str(), "");//remove prompt
+                    let message = message.replace(&prompt.as_str(), ""); //remove prompt
                     let api_key = &config.chat_gpt_api_key;
-                    let client =
-                        ChatGPTClient::new(&api_key, "https://api.openai.com");
-                    let messages = vec![
-                        Message {
-                            role: Role::User,
-                            content: message.trim().to_string(),
-                        }
-                    ];
+                    let client = ChatGPTClient::new(&api_key, "https://api.openai.com");
+                    let messages = vec![Message {
+                        role: Role::User,
+                        content: message.trim().to_string(),
+                    }];
                     // Define the input for the ChatGPTClient
                     let input = ChatInput {
-                        model: Model::Gpt3_5Turbo,   // Set the GPT-3.5 Turbo model
+                        model: Model::Gpt3_5Turbo,  // Set the GPT-3.5 Turbo model
                         messages: messages.clone(), // Pass in the messages vector
                         ..Default::default()
                     };
@@ -186,10 +188,7 @@ pub async fn callback(
                                 });
                                 //reply message to Line
                                 let res = bot
-                                    .reply_message(
-                                        &message_event.reply_token,
-                                        vec![message],
-                                    )
+                                    .reply_message(&message_event.reply_token, vec![message])
                                     .await;
                                 if let Err(e) = res {
                                     error!("Error: {}", e);

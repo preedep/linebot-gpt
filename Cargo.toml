@@ -18,7 +18,7 @@ hmac = "0.12"
 sha2 = "0.10"
 base64 = "0.21"
 rand = "0.8"
-tokio = "1"
+tokio = { version = "1", features = ["full"] }
 futures-util = "0.3"
 opentelemetry-application-insights = {version = "0.29",default-features = false , features = ["reqwest-client-rustls","live-metrics","metrics"]}
 opentelemetry = {version = "0.21", features = ["trace","logs","metrics"]}
@@ -30,4 +30,4 @@ tracing-opentelemetry = "0.22"
 tracing-subscriber = {version = "0.3"}
 tracing-actix-web = "0.7"
 opentelemetry_sdk = { version = "0.21" ,default-features = false, features = ["trace","logs","metrics","rt-tokio"] }
-chat-gpt-lib-rs = "0.3"
+
