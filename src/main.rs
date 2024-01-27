@@ -44,6 +44,8 @@ async fn main() -> std::io::Result<()> {
                 .with_service_name("LineChatBot")
                 .with_live_metrics(true)
                 .install_batch(opentelemetry_sdk::runtime::Tokio);
+
+
         }
 
         let exporter = opentelemetry_application_insights::Exporter::new_from_connection_string(
